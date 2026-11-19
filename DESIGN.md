@@ -178,8 +178,8 @@ Selangor user than one in Sabah.
 
 ## AI tools
 
-TODO (Azryl): state exactly which tools you used and for what. Draft, edit to match what you actually did:
-
-> I used Claude (Anthropic) to profile the feed, draft the code and tests, and draft this document. I reviewed
-> every file, ran everything locally, ran the model comparison myself, and made or confirmed each decision
-> above. I can walk through any line of it.
+I used Claude (Anthropic) throughout: to profile the feed, write most of the code, tests and documentation, and
+debug the Windows setup issues (the `localhost`/IPv6 stall and Ctrl+C handling). I chose which roles and
+trade-offs to go for, ran everything on my own machine, ran the embedding comparison, and reviewed the results;
+the findings in the deep dive come from those runs. I've gone through the design with Claude so I can explain
+every decision in it.
