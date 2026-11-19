@@ -8,6 +8,7 @@ Delivery guarantees, in order of importance:
 """
 
 import asyncio
+import contextlib
 import logging
 import signal
 
@@ -73,14 +74,17 @@ class Consumer:
             stop = asyncio.Event()
             loop = asyncio.get_running_loop()
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, stop.set)
+                # Not supported on Windows; there Ctrl+C raises KeyboardInterrupt instead (handled in main).
+                with contextlib.suppress(NotImplementedError):
+                    loop.add_signal_handler(sig, stop.set)
             await stop.wait()
         log.info("stopped %s", dict(self.counts))
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    asyncio.run(Consumer(config.load()).run())
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(Consumer(config.load()).run())
 
 
 if __name__ == "__main__":
