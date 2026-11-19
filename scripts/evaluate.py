@@ -11,6 +11,7 @@ Usage: uv run python -m scripts.evaluate [model ...]   (default: hash, bge-small
 
 import re
 import sys
+from collections import Counter
 
 import numpy as np
 import psycopg
@@ -45,34 +46,63 @@ def neighbours(vectors: np.ndarray, k: int) -> np.ndarray:
     return np.argsort(-sims, axis=1)[:, :k]
 
 
-def report(model: str, texts: list[str], industries: list[str | None]) -> dict[str, float]:
-    vectors = np.asarray(embedding.get(model).embed(texts), dtype=np.float32)
+def _metrics(vectors: np.ndarray, labels: list[str | None], is_malay: np.ndarray) -> dict[str, float]:
     top = neighbours(vectors, K)
-    labelled = [i for i, ind in enumerate(industries) if ind]
-    industry_at_k = np.mean([np.mean([industries[j] == industries[i] for j in top[i]]) for i in labelled])
-    is_malay = np.array([bool(MALAY.search(t)) for t in texts])
-    malay_to_en = np.mean([np.mean(~is_malay[top[i]]) for i in np.where(is_malay)[0]])
-    en_to_malay = np.mean([np.mean(is_malay[top[i]]) for i in np.where(~is_malay)[0]])
+    labelled = [i for i, ind in enumerate(labels) if ind]
     return {
-        "industry@4": industry_at_k,
-        "malay->english@4": malay_to_en,
-        "english->malay@4": en_to_malay,
-        "malay share": is_malay.mean(),
+        "industry@4": float(np.mean([np.mean([labels[j] == labels[i] for j in top[i]]) for i in labelled])),
+        "malay->english@4": float(np.mean([np.mean(~is_malay[top[i]]) for i in np.where(is_malay)[0]])),
+        "english->malay@4": float(np.mean([np.mean(is_malay[top[i]]) for i in np.where(~is_malay)[0]])),
     }
+
+
+def report(model: str, texts: list[str], industries: list[str | None]) -> dict[str, dict[str, float]]:
+    """Scores per company, and per *distinct* description.
+
+    Only ~174 distinct descriptions cover 2,000 companies, so a company's top-4 is mostly companies with the exact
+    same text, which is always the same language. The per-description view removes those exact duplicates, which is
+    the fair test of whether a model can match across languages at all.
+    """
+    vectors = np.asarray(embedding.get(model).embed(texts), dtype=np.float32)
+    is_malay = np.array([bool(MALAY.search(t)) for t in texts])
+    per_company = _metrics(vectors, industries, is_malay)
+
+    distinct: dict[str, list[str | None]] = {}
+    for text, industry in zip(texts, industries, strict=True):
+        distinct.setdefault(text, []).append(industry)
+    unique = list(distinct)
+    labels = [
+        Counter(i for i in distinct[t] if i).most_common(1)[0][0] if any(distinct[t]) else None for t in unique
+    ]
+    index = {t: texts.index(t) for t in unique}
+    unique_vectors = vectors[[index[t] for t in unique]]
+    unique_malay = np.array([bool(MALAY.search(t)) for t in unique])
+    per_description = _metrics(unique_vectors, labels, unique_malay)
+
+    top = neighbours(unique_vectors, 1)
+    examples = [(t, unique[top[i][0]]) for i, t in enumerate(unique) if unique_malay[i]][:6]
+    return {"per company": per_company, "per distinct description": per_description, "examples": examples}
 
 
 def main() -> None:
     texts, industries = load(config.load().database_url)
     print(f"{len(texts)} active companies with a description, k={K}\n")
+    print(f"{len(set(texts))} distinct descriptions\n")
     for model in sys.argv[1:] or DEFAULT_MODELS:
         try:
-            scores = report(model, texts, industries)
+            result = report(model, texts, industries)
         except Exception as exc:  # e.g. model can't be downloaded
             print(f"{model}: skipped ({exc})")
             continue
         print(model)
-        for name, value in scores.items():
-            print(f"  {name:<18} {value:.3f}")
+        for view in ("per company", "per distinct description"):
+            print(f"  {view}")
+            for name, value in result[view].items():
+                print(f"    {name:<18} {value:.3f}")
+        print("  nearest neighbour of some Malay descriptions:")
+        for text, nearest in result["examples"]:
+            print(f"    {text}  ->  {nearest}")
+        print()
 
 
 if __name__ == "__main__":

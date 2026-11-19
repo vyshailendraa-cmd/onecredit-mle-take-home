@@ -93,6 +93,15 @@ def _clean_text(value: Any) -> str | None:
     return text or None
 
 
+def collapse_repetition(text: str) -> str:
+    """'A B C A B C A B C' -> 'A B C'. Seven descriptions in the feed are one phrase pasted 60 times."""
+    words = text.split()
+    for size in range(1, len(words) // 2 + 1):
+        if len(words) % size == 0 and words == words[:size] * (len(words) // size):
+            return " ".join(words[:size])
+    return text
+
+
 def normalise_state(value: str) -> str:
     key = value.lower()
     return STATES.get(key) or STATE_ALIASES.get(key) or value
@@ -120,7 +129,11 @@ def parse(body: bytes) -> Event:
         for source_key, column in FIELDS.items():
             text = _clean_text(data.get(source_key))
             if text is not None:
-                fields[column] = normalise_state(text) if column == "state" else text
+                if column == "state":
+                    text = normalise_state(text)
+                elif column == "nature_of_business":
+                    text = collapse_repetition(text)
+                fields[column] = text
         if not fields:
             raise InvalidEvent("company-upserted with no usable fields")
     return Event(reg, kind, updated_at, fields)

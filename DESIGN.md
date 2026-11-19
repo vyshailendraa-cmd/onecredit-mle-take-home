@@ -21,6 +21,7 @@ I profiled `data/feed.jsonl` before writing code. Every rule in `app/events.py` 
 | No registration number, or a bare integer (`119`) with placeholder data (`"X"`, `"Trading"`) | 7 + 3 | Rejected. Guessing `119` means `SYN-000119` would attach junk to a real company. |
 | Truncated JSON / `null` body | 5 / 6 | Rejected. |
 | `data` missing or a string (`"companyName=Foo; state=Perak"`) | 9 | Rejected. |
+| Description that is one phrase pasted 60 times (up to 3,359 characters) | 7 | Collapsed to the phrase. Found by reading the quality report's examples, not by the first profiling pass. |
 | Null or blank fields (industry, state, nature of business) | 224 | Ignored: a null means "this source didn't know", not "erase". |
 | State in mixed case (`SELANGOR`, `kuala lumpur`) | 388 | Mapped to the canonical name. |
 | `company-struck-off` events | 8 | Status `struck_off` (see below). |
@@ -82,7 +83,7 @@ reactivates the company; an older one arriving late doesn't.
 ### Retrieval
 - Cosine distance with an **HNSW index**. The target's vector is passed as a parameter rather than a subquery, so
   Postgres uses the index (checked with `EXPLAIN`).
-- **Deterministic ties.** 174 distinct descriptions cover 2,000 companies, so many neighbours are exact ties.
+- **Deterministic ties.** 169 distinct descriptions cover 2,000 companies, so many neighbours are exact ties.
   Without a tie-break the panel can reshuffle between page loads. The query takes a candidate pool from the index,
   then sorts by distance, then same industry as the target, then registration number.
 - Measured locally: **p50 1.6 ms, p95 2.2 ms** over 200 random companies, end to end through the API.
@@ -110,7 +111,7 @@ reactivates the company; an older one arriving late doesn't.
 25,000 messages and 20,000 companies is still small for Postgres; the work per message is what grows.
 
 1. **Embedding is the bottleneck.** Batch messages (prefetch ~100, embed once per batch), and cache vectors by
-   text hash: with 174 distinct descriptions most embeddings are cache hits. Beyond that, move embedding to a
+   text hash: with 169 distinct descriptions most embeddings are cache hits. Beyond that, move embedding to a
    separate worker pool so the consumer only does database work.
 2. **More consumers.** Already safe (per-company lock, idempotent writes). Raise prefetch per consumer and use a
    connection pool.

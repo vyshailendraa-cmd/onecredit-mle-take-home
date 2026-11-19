@@ -94,3 +94,13 @@ def test_struck_off_needs_no_data():
 
 def test_unknown_extra_keys_are_ignored():
     assert parse(message(source="ssm-batch", ingestedBy="partner-api")).registration_number == "SYN-000001"
+
+
+def test_repeated_description_is_collapsed():
+    pasted = " ".join(["Software development for small business accounting"] * 60)
+    event = parse(message(data={"natureOfBusiness": pasted}))
+    assert event.fields["nature_of_business"] == "Software development for small business accounting"
+    # A phrase that merely contains a repeated word is left alone.
+    assert parse(message(data={"natureOfBusiness": "Kerja-kerja kerja awam"})).fields["nature_of_business"] == (
+        "Kerja-kerja kerja awam"
+    )
