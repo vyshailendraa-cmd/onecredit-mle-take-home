@@ -26,7 +26,7 @@ I profiled `data/feed.jsonl` before writing code. Every rule in `app/events.py` 
 | State in mixed case (`SELANGOR`, `kuala lumpur`) | 388 | Mapped to the canonical name. |
 | `company-struck-off` events | 8 | Status `struck_off` (see below). |
 | Descriptions in Malay | ~28% | Drives the embedding model choice. |
-| Distinct descriptions across 2,000 companies | 174 | Many exact ties in similarity; drives the tie-break. |
+| Distinct descriptions across 2,000 companies (after collapsing) | 169 | Many exact ties in similarity; drives the tie-break. |
 
 After one pass of the feed: **2,000 companies, 2,418 events applied, 37 messages quarantined (32 distinct), queue
 empty.** Publishing the feed again changes nothing (checked by hashing the `companies` table before and after).
