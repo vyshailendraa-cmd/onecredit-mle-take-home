@@ -64,7 +64,8 @@ The cost is a read of the company's events per message. Companies have 1–3 eve
 - **Model: `paraphrase-multilingual-MiniLM-L12-v2`** (384 dimensions, CPU, via fastembed). The brief suggests
   `bge-small-en-v1.5`, but 28% of descriptions are Malay ("Hotel butik di Seremban", "Perunding pengurusan untuk
   PKS"). An English-only model can't match "Hotel butik" with "Boutique hotel", which quietly splits the catalogue
-  into a Malay half and an English half. The deep dive below measures this. Any 384-d model can be swapped in
+  into a Malay half and an English half. The deep dive below measures this: on distinct descriptions the
+  multilingual model triples cross-language matches and lifts industry@4 from 0.72 to 0.86. Any 384-d model can be swapped in
   with `EMBEDDING_MODEL`, and the consumer re-embeds a company when the model name changes.
 - **What's embedded: nature of business only**, as the brief asks. For the 39 companies that never had a
   description, it falls back to industry plus name, so they still get a vector and still appear in other
@@ -125,7 +126,6 @@ reactivates the company; an older one arriving late doesn't.
 
 ## What's left
 
-- **Real-model numbers in the deep dive table below** (`just evaluate` on a laptop with the model downloaded).
 - **Metrics and alerting**: consumer lag (queue depth), quarantine rate by reason, embedding latency, API p95
   and 5xx rate, and a daily "companies with no vector" check (should be 0).
 - **Quarantine tooling**: a command to replay `rejected_messages` after a parser fix.
@@ -136,27 +136,45 @@ reactivates the company; an older one arriving late doesn't.
 
 ## Deep dive: recommendation quality
 
-There are no click labels yet, so `scripts/evaluate.py` uses two proxies on the 1,953 active companies with a
-description, at k = 4 (the panel size):
+There are no click labels yet, so `scripts/evaluate.py` uses two proxies at k = 4 (the panel size), on the 1,953
+active companies with a description:
 
 - **industry@4**: share of neighbours in the same industry.
-- **cross-language@4**: for Malay descriptions, the share of neighbours that are English, and vice versa. Same
-  industry in a different language is a correct match the portal user would want to see.
+- **cross-language@4**: for Malay descriptions, the share of neighbours that are English, and vice versa. A
+  same-business match in the other language is exactly what a portal user would want to see.
+
+**First attempt, per company, and why it misled me.** Measured per company, all three models looked alike and
+cross-language matches were near zero (bge-small 0.015, multilingual 0.035). The reason is the data: only 169
+distinct descriptions cover 2,000 companies, so a company's top 4 is mostly *other companies with the exact same
+text*, which is always the same language. That measures duplicates, not the model.
+
+**Fair test: per distinct description** (exact duplicates removed, each description's neighbours among the others):
 
 | Model | industry@4 | Malay→English@4 | English→Malay@4 |
 |---|---|---|---|
-| `hash` (placeholder) | 0.955 | 0.000 | 0.000 |
-| `BAAI/bge-small-en-v1.5` | TODO | TODO | TODO |
-| `paraphrase-multilingual-MiniLM-L12-v2` (default) | TODO | TODO | TODO |
+| `hash` (placeholder) | 0.713 | 0.074 | 0.029 |
+| `BAAI/bge-small-en-v1.5` (suggested in the brief) | 0.716 | 0.148 | 0.126 |
+| `paraphrase-multilingual-MiniLM-L12-v2` (default) | **0.864** | **0.422** | **0.267** |
 
-**What the placeholder row already shows:** industry@4 can look excellent while the catalogue is split by
-language. The hashing embedder never pairs a Malay description with an English one, yet scores 0.955 on
-industry, because each half is internally coherent. That's why I report both numbers: industry@4 alone would
-have hidden the problem the multilingual model is there to fix.
+Nearest neighbour of some Malay descriptions:
 
-**Next steps on quality**: label a small set of pairs by hand to calibrate the proxies; try embedding
-`industry + nature of business` (weighed against the brief's "nature of business" scope); add a light
-re-rank by state, since a Selangor café is probably more useful to a Selangor user than one in Sabah.
+| Malay description | bge-small-en | multilingual |
+|---|---|---|
+| Perunding pengurusan untuk PKS | Accounting software for small businesses (Malay) | Management consulting for SMEs |
+| Farmasi komuniti dan makanan tambahan | Coffee shop and café (Malay) | Community pharmacy and health supplements |
+| Kerja-kerja kejuruteraan awam jalan dan saliran | Grocery shop (Malay) | Civil engineering works for roads and drainage |
+| Hotel butik di Seremban | Boutique hotel in Seremban | Boutique hotel in Seremban |
+
+The English-only model matches Malay text on surface words ("untuk", "dan") and lands on unrelated businesses; the
+multilingual model finds the translation. That's the decision justified with data rather than intuition.
+
+**What the exercise taught me:** an aggregate metric can be dominated by a quirk of the data (here, duplicates).
+Reading the actual neighbours caught both that and a data bug: 7 descriptions were one phrase pasted 60 times,
+now collapsed in `app/events.py`.
+
+**Next steps on quality**: label a few hundred pairs by hand to replace the proxies; try embedding
+`industry + nature of business`; a light re-rank by state, since a Selangor café is probably more useful to a
+Selangor user than one in Sabah.
 
 ## AI tools
 
