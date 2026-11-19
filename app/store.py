@@ -25,7 +25,7 @@ class Outcome(StrEnum):
 
 
 def connect(url: str) -> psycopg.Connection:
-    conn = psycopg.connect(url)
+    conn = psycopg.connect(url, connect_timeout=5)
     migrate(conn)
     register_vector(conn)
     return conn

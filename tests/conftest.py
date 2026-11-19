@@ -12,8 +12,8 @@ from app.embedding import HashingEmbedder
 from app.store import connect
 
 PORT = os.environ.get("POSTGRES_PORT", "5432")
-ADMIN_URL = f"postgresql://postgres:postgres@localhost:{PORT}/postgres"
-TEST_URL = os.environ.get("TEST_DATABASE_URL", f"postgresql://postgres:postgres@localhost:{PORT}/companies_test")
+ADMIN_URL = f"postgresql://postgres:postgres@127.0.0.1:{PORT}/postgres"
+TEST_URL = os.environ.get("TEST_DATABASE_URL", f"postgresql://postgres:postgres@127.0.0.1:{PORT}/companies_test")
 
 
 @pytest.fixture(scope="session")

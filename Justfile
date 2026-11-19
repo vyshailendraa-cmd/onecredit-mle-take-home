@@ -16,7 +16,7 @@ down:
 
 # Replay the registry feed onto the company-events queue.
 publish:
-    uv run python -m producer.publish
+    RABBITMQ_URL="${RABBITMQ_URL:-amqp://guest:guest@127.0.0.1:${RABBITMQ_PORT:-5672}/}" uv run python -m producer.publish
 
 # Consume company-events into Postgres (runs until Ctrl+C).
 consume:

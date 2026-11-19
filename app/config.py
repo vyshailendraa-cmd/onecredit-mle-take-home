@@ -17,9 +17,9 @@ def load() -> Settings:
     mq_port = os.environ.get("RABBITMQ_PORT", "5672")
     return Settings(
         database_url=os.environ.get(
-            "DATABASE_URL", f"postgresql://postgres:postgres@localhost:{pg_port}/companies"
+            "DATABASE_URL", f"postgresql://postgres:postgres@127.0.0.1:{pg_port}/companies"
         ),
-        rabbitmq_url=os.environ.get("RABBITMQ_URL", f"amqp://guest:guest@localhost:{mq_port}/"),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL", f"amqp://guest:guest@127.0.0.1:{mq_port}/"),
         queue=os.environ.get("QUEUE", "company-events"),
         # "hash" selects the dependency-free placeholder embedder (used in tests).
         embedding_model=os.environ.get(

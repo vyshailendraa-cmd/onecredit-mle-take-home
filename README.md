@@ -17,6 +17,9 @@ just publish    # terminal 2: publish the feed
 just serve      # terminal 3: API on http://localhost:8000 (interactive docs at /docs)
 ```
 
+Connections use `127.0.0.1` rather than `localhost`: on Windows, `localhost` resolves to IPv6 first, and Docker
+publishes these ports on IPv4 only, so every connection would stall before falling back.
+
 The consumer creates its tables on start. The first start downloads the embedding model
 (`paraphrase-multilingual-MiniLM-L12-v2`, about 220 MB) and caches it. To run without a download, use the
 placeholder embedder: `EMBEDDING_MODEL=hash just consume`.

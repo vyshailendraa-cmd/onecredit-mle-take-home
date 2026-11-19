@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         max_size=10,
         open=False,
         configure=register_vector,
-        kwargs={"row_factory": dict_row},
+        kwargs={"row_factory": dict_row, "connect_timeout": 5},
     )
     pool.open(wait=False)
     app.state.pool = pool
